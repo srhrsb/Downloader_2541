@@ -2,6 +2,10 @@ package com.brh.downloader_2541;
 
 import javafx.fxml.FXML;
 import javafx.scene.control.TextField;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.Stage;
+
+import java.io.File;
 
 public class Controller {
 
@@ -26,12 +30,29 @@ public class Controller {
 //
 //    f) Implementieren Sie, das alle URLs beim Start des Downloads in der Tabelle angezeigt werden und die bereits geladenen Bytes während des Downloads angezeigt werden.
 //
-
     /**
      * Download der in URL gegebenen Datei in den Ordner, der in target gegeben ist
      */
     @FXML
     protected void onDownloadClick() {
 
+        String from = url.getText();
+        String to = target.getText();
+
+        if(!from.isBlank() && !to.isBlank()){
+            var download = new Download( from, to );
+            download.execute();
+        }
+    }
+
+    @FXML
+    protected void searchFolder() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setInitialDirectory( new File(System.getProperty("user.home")) );
+        File selected = directoryChooser.showDialog( App.getStage() );
+
+        if(selected != null) {
+            target.setText(selected.getAbsolutePath());
+        }
     }
 }
