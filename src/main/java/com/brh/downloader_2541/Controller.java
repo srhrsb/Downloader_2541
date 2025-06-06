@@ -1,7 +1,12 @@
 package com.brh.downloader_2541;
 
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 
@@ -10,39 +15,70 @@ import java.io.File;
 public class Controller {
 
     @FXML
-    TextField url;
+    private TextField url;
 
     @FXML
-    TextField target;
+    private TextField target;
 
-//________AUFGABEN_________________________________________________________________________________________
-//    a) Sorgen Sie dafür, dass auf Knopfdruck ein Download in den angegebenen Folder durchgeführt wird.
-//
-//    b) Implementieren Sie, dass der Zielordner via Folder-Dialog angegeben werden kann.
-//
-//    c) Bauen Sie die Klasse "Download" so um, dass Sie nebenläufig funktioniert.
-//
-//    d) Stellen Sie fest, ob es sich bei der URL um einen Ordner handelt. Wenn das der Fall ist, soll der
-//    gesamte Ordnerinhalt runtergeladen werden, sonst nur die einzelne Datei.
-//
-//    e) Fügen Sie eine Tabelle hinzu, die die URLs anzeigen soll, die gerade runtergeladen werden. In der
-//    ersten Spalte die URL, in der zweiten die bereits geladenen Bytes.
-//
-//    f) Implementieren Sie, das alle URLs beim Start des Downloads in der Tabelle angezeigt werden und die bereits geladenen Bytes während des Downloads angezeigt werden.
-//
+    @FXML
+    private TableView<DownloadItem> tableView;
+
+    @FXML
+    private TableColumn<DownloadItem, String> columnUrls;
+
+    @FXML
+    private TableColumn<DownloadItem, Integer> columnBytes;
+
+    private final ObservableList<DownloadItem> downloadItems = FXCollections.observableArrayList();
+
+    /**
+     * Initialisierung bei Instanzierung dieses Objekts
+     * es wird der Bezug der Spalten des TableView zur Modellklasse
+     * DownloadItem hergestellt
+     */
+    @FXML
+    public void initialize() {
+        columnUrls.setCellValueFactory(new PropertyValueFactory<DownloadItem,String>("Link"));
+        columnBytes.setCellValueFactory(new PropertyValueFactory<DownloadItem,Integer>("DownloadedBytes"));
+    }
+
     /**
      * Download der in URL gegebenen Datei in den Ordner, der in target gegeben ist
      */
     @FXML
     protected void onDownloadClick() {
+        String targetFolder = target.getText();
 
-        String from = url.getText();
-        String to = target.getText();
-
-        if(!from.isBlank() && !to.isBlank()){
-            var download = new Download( from, to );
-            download.execute();
+        if(!targetFolder.isEmpty())   {
+            int downloadIndex = 0;
+            for( var item : downloadItems){
+                //nebenläufiger Prozess der Objecte vom Typen "Runable" ausführt
+                new Thread( new Download( item.getLink(), targetFolder, downloadIndex, this::updateBytes ) ).start();
+                downloadIndex++;
+            }
         }
+    }
+    /**
+     * Link wird hinzugefügt zur Liste DownloadItems und an TableView zur Darstellung übergeben
+     */
+    @FXML
+    public void addLink() {
+
+        String link = url.getText();
+        if(link.isEmpty()) return;
+
+        var urlList = Directories.getAllFiles(link);
+
+        if(urlList!= null){
+            for( var l : urlList){
+                downloadItems.add(new DownloadItem(l, 0));
+            }
+        }
+
+        downloadItems.add(new DownloadItem(link, 0));
+        url.setText("");
+
+        tableView.setItems( downloadItems );
     }
 
     @FXML
@@ -54,5 +90,50 @@ public class Controller {
         if(selected != null) {
             target.setText(selected.getAbsolutePath());
         }
+    }
+
+    /**
+     * Alle Downloads löschen
+     */
+    @FXML
+    protected void clearAllDownloads(){
+        downloadItems.clear();
+        tableView.setItems( downloadItems );
+    }
+
+    /**
+     * Download der sich im Focus befindet
+     */
+    @FXML
+    protected void deleteDownload(){
+        var focus = tableView.getFocusModel();
+        int index = focus.focusedIndexProperty().getValue();
+        downloadItems.remove(index);
+        tableView.setItems( downloadItems );
+    }
+
+
+    /**
+     * Starten der Downloads, welche in der Liste eingetragen sind
+     */
+    @FXML
+    protected void download() {
+        String targetFolder = target.getText();
+
+        if (!targetFolder.isEmpty()) {
+            int downloadIndex = 0;
+            for (var item : downloadItems) {
+                //nebenläufiger Prozess der Objecte vom Typen "Runable" ausführt
+                new Thread( new Download(item.getLink(), targetFolder, downloadIndex, this::updateBytes) ).start();
+                downloadIndex++;
+            }
+        }
+    }
+
+    private void updateBytes( int index, int bytes) {
+        var downloadItem = downloadItems.get(index);
+        downloadItem.setDownloadedBytes( bytes);
+        tableView.setItems( downloadItems );
+        tableView.refresh();
     }
 }
